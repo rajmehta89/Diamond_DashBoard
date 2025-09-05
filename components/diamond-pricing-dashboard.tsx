@@ -22,8 +22,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   const [searchTerm, setSearchTerm] = useState("")
   const [colourFilter, setColourFilter] = useState<string>("all")
   const [clarityFilter, setClarityFilter] = useState<string>("all")
-  const [sortField, setSortField] = useState<keyof DiamondData>("rate")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
@@ -65,7 +63,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   const uniqueClarities = useMemo(() => Array.from(new Set(data.map((item) => item.clarity))).sort(), [data])
 
   const filteredData = useMemo(() => {
-    const filtered = data.filter((item) => {
+    return data.filter((item) => {
       const matchesSearch =
         searchTerm === "" ||
         Object.values(item).some((value) => value.toString().toLowerCase().includes(searchTerm.toLowerCase()))
@@ -75,22 +73,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
 
       return matchesSearch && matchesColour && matchesClarity
     })
-
-    filtered.sort((a, b) => {
-      const aValue = a[sortField]
-      const bValue = b[sortField]
-
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue
-      }
-
-      const aStr = aValue.toString()
-      const bStr = bValue.toString()
-      return sortDirection === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr)
-    })
-
-    return filtered
-  }, [data, searchTerm, colourFilter, clarityFilter, sortField, sortDirection])
+  }, [data, searchTerm, colourFilter, clarityFilter])
 
   const stats = useMemo(() => {
     const totalInventory = data.length
@@ -101,15 +84,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
 
     return { totalInventory, filteredCount, averageRate, highestRate }
   }, [data, filteredData])
-
-  const handleSort = (field: keyof DiamondData) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("desc")
-    }
-  }
 
   return (
     <div className="space-y-8">
@@ -243,30 +217,10 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead
-                    className="cursor-pointer text-card-foreground hover:text-primary"
-                    onClick={() => handleSort("sleeve")}
-                  >
-                    Sleeve {sortField === "sleeve" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-card-foreground hover:text-primary"
-                    onClick={() => handleSort("colour")}
-                  >
-                    Colour {sortField === "colour" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-card-foreground hover:text-primary"
-                    onClick={() => handleSort("clarity")}
-                  >
-                    Clarity {sortField === "clarity" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-card-foreground hover:text-primary text-right"
-                    onClick={() => handleSort("rate")}
-                  >
-                    Rate {sortField === "rate" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
+                  <TableHead className="text-card-foreground">Sleeve</TableHead>
+                  <TableHead className="text-card-foreground">Colour</TableHead>
+                  <TableHead className="text-card-foreground">Clarity</TableHead>
+                  <TableHead className="text-right text-card-foreground">Rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
