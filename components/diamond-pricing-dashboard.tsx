@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react"
 import type { DiamondData } from "@/lib/google-sheets"
-import { fetchDiamondDataClient } from "@/lib/google-sheets"
+import { fetchDiamondData } from "@/lib/google-sheets"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      const newData = await fetchDiamondDataClient()
+      const newData = await fetchDiamondData()
       if (newData.length > 0) {
         setData(newData)
         console.log("[v0] Data refreshed successfully:", newData.length, "items")
@@ -43,7 +43,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   useEffect(() => {
     if (initialData.length === 0) {
       setIsLoading(true)
-      fetchDiamondDataClient().then((clientData) => {
+      fetchDiamondData().then((clientData: DiamondData[]) => {
         if (clientData.length > 0) {
           setData(clientData)
         }
