@@ -1,33 +1,69 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import type { DiamondData } from "@/lib/google-sheets"
+import { fetchDiamondDataClient } from "@/lib/google-sheets"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Gem, TrendingUp, Filter, Search } from "lucide-react"
+import { Gem, TrendingUp, Filter, Search, RefreshCw } from "lucide-react"
 
 interface DiamondPricingDashboardProps {
   initialData: DiamondData[]
 }
 
 export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboardProps) {
-  const [data] = useState<DiamondData[]>(initialData)
+  const [data, setData] = useState<DiamondData[]>(initialData)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [colourFilter, setColourFilter] = useState<string>("all")
   const [clarityFilter, setClarityFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<keyof DiamondData>("rate")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
 
-  // Get unique values for filters
+  const refreshData = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      const newData = await fetchDiamondDataClient()
+      if (newData.length > 0) {
+        setData(newData)
+        console.log("[v0] Data refreshed successfully:", newData.length, "items")
+      }
+    } catch (error) {
+      console.error("[v0] Error refreshing data:", error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (initialData.length === 0) {
+      setIsLoading(true)
+      fetchDiamondDataClient().then((clientData) => {
+        if (clientData.length > 0) {
+          setData(clientData)
+        }
+        setIsLoading(false)
+      })
+    }
+  }, [initialData])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshData()
+    }, 5000) // Refresh every 30 seconds
+
+    return () => clearInterval(interval)
+  }, [refreshData])
+
   const uniqueColours = useMemo(() => Array.from(new Set(data.map((item) => item.colour))).sort(), [data])
 
   const uniqueClarities = useMemo(() => Array.from(new Set(data.map((item) => item.clarity))).sort(), [data])
 
-  // Filter and sort data
   const filteredData = useMemo(() => {
     const filtered = data.filter((item) => {
       const matchesSearch =
@@ -40,7 +76,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
       return matchesSearch && matchesColour && matchesClarity
     })
 
-    // Sort data
     filtered.sort((a, b) => {
       const aValue = a[sortField]
       const bValue = b[sortField]
@@ -57,7 +92,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
     return filtered
   }, [data, searchTerm, colourFilter, clarityFilter, sortField, sortDirection])
 
-  // Calculate stats
   const stats = useMemo(() => {
     const totalInventory = data.length
     const filteredCount = filteredData.length
@@ -79,7 +113,14 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
 
   return (
     <div className="space-y-8">
-      {/* Stats Dashboard */}
+      {isLoading && (
+        <Card className="bg-card border-border">
+          <CardContent className="py-8">
+            <div className="text-center text-muted-foreground">Loading diamond data from Google Sheets...</div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -122,10 +163,21 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
         </Card>
       </div>
 
-      {/* Filters and Search */}
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-card-foreground">Search & Filters</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-card-foreground">Search & Filters</CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshData}
+              disabled={isRefreshing}
+              className="border-border text-foreground hover:bg-accent bg-transparent"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isRefreshing ? "Refreshing..." : "Refresh Data"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -182,7 +234,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
         </CardContent>
       </Card>
 
-      {/* Data Table */}
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="text-card-foreground">Diamond Pricing Data</CardTitle>
@@ -235,8 +286,12 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
             </Table>
           </div>
 
-          {filteredData.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">No diamonds found matching your criteria.</div>
+          {filteredData.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              {data.length === 0
+                ? "No data available. Please check your Google Sheets configuration."
+                : "No diamonds found matching your criteria."}
+            </div>
           )}
         </CardContent>
       </Card>
