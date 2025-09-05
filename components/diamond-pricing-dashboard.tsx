@@ -20,8 +20,15 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   const [isLoading, setIsLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+<<<<<<< HEAD
   const [colourFilter, setColourFilter] = useState<string>("all")
   const [clarityFilter, setClarityFilter] = useState<string>("all")
+=======
+  const [colourFilter, setColourFilter] = useState<string[]>([])
+  const [clarityFilter, setClarityFilter] = useState<string[]>([])
+  const [sortField, setSortField] = useState<keyof DiamondData>("rate")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
+>>>>>>> dee368d (changed diamonds dashboard)
 
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
@@ -29,10 +36,10 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
       const newData = await fetchDiamondData()
       if (newData.length > 0) {
         setData(newData)
-        console.log("[v0] Data refreshed successfully:", newData.length, "items")
+        console.log("[v1] Data refreshed successfully:", newData.length, "items")
       }
     } catch (error) {
-      console.error("[v0] Error refreshing data:", error)
+      console.error("[v1] Error refreshing data:", error)
     } finally {
       setIsRefreshing(false)
     }
@@ -42,24 +49,18 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
     if (initialData.length === 0) {
       setIsLoading(true)
       fetchDiamondData().then((clientData: DiamondData[]) => {
-        if (clientData.length > 0) {
-          setData(clientData)
-        }
+        if (clientData.length > 0) setData(clientData)
         setIsLoading(false)
       })
     }
   }, [initialData])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      refreshData()
-    }, 5000) // Refresh every 30 seconds
-
+    const interval = setInterval(() => refreshData(), 5000)
     return () => clearInterval(interval)
   }, [refreshData])
 
   const uniqueColours = useMemo(() => Array.from(new Set(data.map((item) => item.colour))).sort(), [data])
-
   const uniqueClarities = useMemo(() => Array.from(new Set(data.map((item) => item.clarity))).sort(), [data])
 
   const filteredData = useMemo(() => {
@@ -68,8 +69,11 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
         searchTerm === "" ||
         Object.values(item).some((value) => value.toString().toLowerCase().includes(searchTerm.toLowerCase()))
 
-      const matchesColour = colourFilter === "all" || item.colour === colourFilter
-      const matchesClarity = clarityFilter === "all" || item.clarity === clarityFilter
+      const matchesColour =
+        colourFilter.length === 0 || colourFilter.includes(item.colour)
+
+      const matchesClarity =
+        clarityFilter.length === 0 || clarityFilter.includes(item.clarity)
 
       return matchesSearch && matchesColour && matchesClarity
     })
@@ -85,6 +89,26 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
     return { totalInventory, filteredCount, averageRate, highestRate }
   }, [data, filteredData])
 
+<<<<<<< HEAD
+=======
+  const handleSort = (field: keyof DiamondData) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+    } else {
+      setSortField(field)
+      setSortDirection("desc")
+    }
+  }
+
+  const toggleFilter = (value: string, filter: string[], setFilter: (v: string[]) => void) => {
+    if (filter.includes(value)) {
+      setFilter(filter.filter((v) => v !== value))
+    } else {
+      setFilter([...filter, value])
+    }
+  }
+
+>>>>>>> dee368d (changed diamonds dashboard)
   return (
     <div className="space-y-8">
       {isLoading && (
@@ -165,29 +189,35 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
               />
             </div>
 
-            <Select value={colourFilter} onValueChange={setColourFilter}>
+            {/* Multi-select Colour Filter */}
+            <Select>
               <SelectTrigger className="bg-input border-border text-foreground">
-                <SelectValue placeholder="Filter by Colour" />
+                <SelectValue placeholder={`Colour (${colourFilter.length})`} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Colours</SelectItem>
                 {uniqueColours.map((colour) => (
-                  <SelectItem key={colour} value={colour}>
-                    {colour}
+                  <SelectItem key={colour} value={colour} onClick={() => toggleFilter(colour, colourFilter, setColourFilter)}>
+                    <div className="flex items-center justify-between">
+                      <span>{colour}</span>
+                      {colourFilter.includes(colour) && <span>✓</span>}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={clarityFilter} onValueChange={setClarityFilter}>
+            {/* Multi-select Clarity Filter */}
+            <Select>
               <SelectTrigger className="bg-input border-border text-foreground">
-                <SelectValue placeholder="Filter by Clarity" />
+                <SelectValue placeholder={`Clarity (${clarityFilter.length})`} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Clarities</SelectItem>
                 {uniqueClarities.map((clarity) => (
-                  <SelectItem key={clarity} value={clarity}>
-                    {clarity}
+                  <SelectItem key={clarity} value={clarity} onClick={() => toggleFilter(clarity, clarityFilter, setClarityFilter)}>
+                    <div className="flex items-center justify-between">
+                      <span>{clarity}</span>
+                      {clarityFilter.includes(clarity) && <span>✓</span>}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -197,8 +227,8 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
               variant="outline"
               onClick={() => {
                 setSearchTerm("")
-                setColourFilter("all")
-                setClarityFilter("all")
+                setColourFilter([])
+                setClarityFilter([])
               }}
               className="border-border text-foreground hover:bg-accent"
             >
