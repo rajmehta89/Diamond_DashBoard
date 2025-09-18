@@ -1,8 +1,14 @@
 export interface DiamondData {
   sleeve: string;
   colour: string;
-  clarity: string;
-  rate: number;
+  vvs: number;
+  vs1: number;
+  vs2: number;
+  si1: number;
+  si2: number;
+  si3: number;
+  i1: number;
+  i2: number;
 }
 
 export async function fetchDiamondData(): Promise<DiamondData[]> {
@@ -62,54 +68,58 @@ export async function fetchDiamondData(): Promise<DiamondData[]> {
       const columns = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((col) => col.replace(/^"|"$/g, "").trim());
       console.log(`[v0] Line ${i} parsed columns:`, columns);
 
-      if (columns.length >= 4) {
-        const [sleeve, colour, clarity, rateStr] = columns;
-
-        // Check if all four fields are empty
-        if (!sleeve && !colour && !clarity && !rateStr) {
-          console.log(`[v0] Line ${i} skipped: all four fields (sleeve, colour, clarity, rateStr) are empty`);
-          continue;
-        }
+      // Check if we have at least 10 columns
+      if (columns.length >= 10) {
+        const sleeve = columns[0];
+        const colour = columns[1];
+        const vvs = columns[2];
+        const vs1 = columns[3];
+        const vs2 = columns[4];
+        const si1 = columns[5];
+        const si2 = columns[6];
+        const si3 = columns[7];
+        const i1 = columns[8];
+        const i2 = columns[9];
 
         // Clean sleeve data (replace -- with -)
         const cleanSleeve = sleeve.replace(/--/g, "-");
 
-        // Parse rate as number, default to 0 if empty or invalid
-        const rate = rateStr ? Number.parseFloat(rateStr.replace(/[^\d.-]/g, "")) : 0;
-        console.log(`[v0] Line ${i} parsed values:`, {
-          sleeve: cleanSleeve,
-          colour,
-          clarity,
-          rateStr,
-          rate,
-        });
+        // Check if sleeve and colour have data
+        if (cleanSleeve && colour) {
+          // Parse each rate as number, default to 0 if empty or invalid
+          const parseRate = (rateStr: string) => {
+            return rateStr ? Number.parseFloat(rateStr.replace(/[^\d.-]/g, "")) : 0;
+          };
 
-        // Validate fields (only sleeve, colour, clarity need to be non-empty, rate is always valid)
-        const isValidSleeve = !!cleanSleeve;
-        const isValidColour = !!colour;
-        const isValidClarity = !!clarity;
-        const isValidRate = !isNaN(rate); // Always true since rate defaults to 0
-
-        if (isValidSleeve && isValidColour && isValidClarity) {
-          data.push({
+          const diamondData: DiamondData = {
             sleeve: cleanSleeve,
             colour: colour.toUpperCase(),
-            clarity: clarity.toUpperCase(),
-            rate: rate,
+            vvs: parseRate(vvs),
+            vs1: parseRate(vs1),
+            vs2: parseRate(vs2),
+            si1: parseRate(si1),
+            si2: parseRate(si2),
+            si3: parseRate(si3),
+            i1: parseRate(i1),
+            i2: parseRate(i2),
+          };
+
+          console.log(`[v0] Line ${i} parsed data:`, diamondData);
+
+          // Only add if at least one rate is valid (not 0)
+          const hasValidRate = Object.values(diamondData).some((value, index) => {
+            if (index < 2) return false; // Skip sleeve and colour
+            return typeof value === 'number' && value > 0;
           });
-          console.log(`[v0] Line ${i} added to data`);
+
+          if (hasValidRate) {
+            data.push(diamondData);
+            console.log(`[v0] Line ${i} added to data`);
+          } else {
+            console.log(`[v0] Line ${i} skipped: no valid rates found`);
+          }
         } else {
-          console.log(`[v0] Line ${i} skipped due to invalid fields:`, {
-            isValidSleeve,
-            isValidColour,
-            isValidClarity,
-            isValidRate,
-            sleeve: cleanSleeve,
-            colour,
-            clarity,
-            rateStr,
-            rate,
-          });
+          console.log(`[v0] Line ${i} skipped: missing sleeve or colour data`);
         }
       } else {
         console.log(`[v0] Line ${i} has insufficient columns:`, columns);
