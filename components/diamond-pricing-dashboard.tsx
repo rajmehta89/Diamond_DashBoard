@@ -22,6 +22,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [colourFilter, setColourFilter] = useState<string[]>([])
+  const [sleeveFilter, setSleeveFilter] = useState<string[]>([])
   const [clarityFilter, setClarityFilter] = useState<string[]>([])
 
   const refreshData = useCallback(async () => {
@@ -55,42 +56,18 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
   }, [refreshData])
 
   const uniqueColours = useMemo(() => {
-    const defaultColours = [
-      "D",
-      "E",
-      "F",
-      "G",
-      "H",
-      "I",
-      "J",
-      "K",
-      "L",
-      "M",
-      "N",
-      "O",
-      "P",
-      "Q",
-      "R",
-      "S",
-      "T",
-      "U",
-      "V",
-      "W",
-      "X",
-      "Y",
-      "Z",
-    ]
     const dataColours = Array.from(new Set(data.map((item) => item.colour)))
-    const allColours = Array.from(new Set([...defaultColours, ...dataColours]))
-    return allColours
+    return dataColours.sort()
   }, [data])
 
-  const uniqueClarities = useMemo(() => {
-    const defaultClarities = ["FL", "IF", "VVS1", "VVS2", "VS1", "VS2", "SI1", "SI2", "I1", "I2", "I3"]
-    const dataClarities = Array.from(new Set(data.map((item) => item.clarity)))
-    const allClarities = Array.from(new Set([...defaultClarities, ...dataClarities]))
-    return allClarities
+  const uniqueSleeves = useMemo(() => {
+    const dataSleeves = Array.from(new Set(data.map((item) => item.sleeve)))
+    return dataSleeves.sort()
   }, [data])
+
+  const clarityOptions = useMemo(() => {
+    return ["VVS", "VS1", "VS2", "SI1", "SI2", "SI3", "I1", "I2"]
+  }, [])
 
   const filteredData = useMemo(() => {
     const filtered = data.filter((item) => {
@@ -99,20 +76,32 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
         Object.values(item).some((value) => value.toString().toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchesColour = colourFilter.length === 0 || colourFilter.includes(item.colour)
-      const matchesClarity = clarityFilter.length === 0 || clarityFilter.includes(item.clarity)
+      const matchesSleeve = sleeveFilter.length === 0 || sleeveFilter.includes(item.sleeve)
+      
+      // Check if any of the selected clarities have a rate > 0
+      const matchesClarity = clarityFilter.length === 0 || 
+        clarityFilter.some(clarity => {
+          const clarityKey = clarity.toLowerCase().replace(/\s+/g, '') as keyof DiamondData
+          return item[clarityKey] > 0
+        })
 
-      return matchesSearch && matchesColour && matchesClarity
+      return matchesSearch && matchesColour && matchesSleeve && matchesClarity
     })
 
     return filtered
-  }, [data, searchTerm, colourFilter, clarityFilter])
+  }, [data, searchTerm, colourFilter, sleeveFilter, clarityFilter])
 
   const stats = useMemo(() => {
     const totalInventory = data.length
     const filteredCount = filteredData.length
-    const averageRate =
-      filteredData.length > 0 ? filteredData.reduce((sum, item) => sum + item.rate, 0) / filteredData.length : 0
-    const highestRate = filteredData.length > 0 ? Math.max(...filteredData.map((item) => item.rate)) : 0
+    
+    // Calculate average and highest rates from all clarity columns
+    const allRates = filteredData.flatMap(item => [
+      item.vvs, item.vs1, item.vs2, item.si1, item.si2, item.si3, item.i1, item.i2
+    ]).filter(rate => rate > 0)
+    
+    const averageRate = allRates.length > 0 ? allRates.reduce((sum, rate) => sum + rate, 0) / allRates.length : 0
+    const highestRate = allRates.length > 0 ? Math.max(...allRates) : 0
 
     return { totalInventory, filteredCount, averageRate, highestRate }
   }, [data, filteredData])
@@ -128,6 +117,10 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
 
   const removeFilterItem = (value: string, filter: string[], setFilter: (v: string[]) => void) => {
     setFilter(filter.filter((v) => v !== value))
+  }
+
+  const formatRate = (rate: number) => {
+    return rate > 0 ? `₹${rate.toLocaleString()}` : '-'
   }
 
   return (
@@ -199,7 +192,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
           </div>
         </CardHeader>
         <CardContent className="overflow-visible">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -215,7 +208,6 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
                 <Button
                   variant="outline"
                   className="justify-between bg-input border-border text-foreground hover:bg-accent"
-                  onClick={() => console.log("[v0] Colour popover clicked")}
                 >
                   <span>{colourFilter.length === 0 ? "Select Colours" : `Colours (${colourFilter.length})`}</span>
                   <ChevronDown className="h-4 w-4" />
@@ -230,10 +222,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
                         <Checkbox
                           id={`colour-${colour}`}
                           checked={colourFilter.includes(colour)}
-                          onCheckedChange={() => {
-                            console.log("[v0] Toggling colour:", colour)
-                            toggleFilter(colour, colourFilter, setColourFilter)
-                          }}
+                          onCheckedChange={() => toggleFilter(colour, colourFilter, setColourFilter)}
                         />
                         <label
                           htmlFor={`colour-${colour}`}
@@ -253,7 +242,40 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
                 <Button
                   variant="outline"
                   className="justify-between bg-input border-border text-foreground hover:bg-accent"
-                  onClick={() => console.log("[v0] Clarity popover clicked")}
+                >
+                  <span>{sleeveFilter.length === 0 ? "Select Sleeves" : `Sleeves (${sleeveFilter.length})`}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-0 bg-white dark:bg-gray-800 border shadow-lg z-[1000]" align="start" sideOffset={5}>
+                <div className="p-4 space-y-2">
+                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Select Sleeves</div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {uniqueSleeves.map((sleeve) => (
+                      <div key={sleeve} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sleeve-${sleeve}`}
+                          checked={sleeveFilter.includes(sleeve)}
+                          onCheckedChange={() => toggleFilter(sleeve, sleeveFilter, setSleeveFilter)}
+                        />
+                        <label
+                          htmlFor={`sleeve-${sleeve}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer text-gray-900 dark:text-gray-100"
+                        >
+                          {sleeve}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger>
+                <Button
+                  variant="outline"
+                  className="justify-between bg-input border-border text-foreground hover:bg-accent"
                 >
                   <span>{clarityFilter.length === 0 ? "Select Clarity" : `Clarity (${clarityFilter.length})`}</span>
                   <ChevronDown className="h-4 w-4" />
@@ -263,15 +285,12 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
                 <div className="p-4 space-y-2">
                   <div className="font-medium text-sm text-gray-900 dark:text-gray-100">Select Clarity</div>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {uniqueClarities.map((clarity) => (
+                    {clarityOptions.map((clarity) => (
                       <div key={clarity} className="flex items-center space-x-2">
                         <Checkbox
                           id={`clarity-${clarity}`}
                           checked={clarityFilter.includes(clarity)}
-                          onCheckedChange={() => {
-                            console.log("[v0] Toggling clarity:", clarity)
-                            toggleFilter(clarity, clarityFilter, setClarityFilter)
-                          }}
+                          onCheckedChange={() => toggleFilter(clarity, clarityFilter, setClarityFilter)}
                         />
                         <label
                           htmlFor={`clarity-${clarity}`}
@@ -291,6 +310,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
               onClick={() => {
                 setSearchTerm("")
                 setColourFilter([])
+                setSleeveFilter([])
                 setClarityFilter([])
               }}
               className="border-border text-foreground hover:bg-accent"
@@ -299,7 +319,7 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
             </Button>
           </div>
 
-          {(colourFilter.length > 0 || clarityFilter.length > 0) && (
+          {(colourFilter.length > 0 || sleeveFilter.length > 0 || clarityFilter.length > 0) && (
             <div className="mt-4 space-y-2">
               {colourFilter.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -312,6 +332,22 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
                       onClick={() => removeFilterItem(colour, colourFilter, setColourFilter)}
                     >
                       {colour}
+                      <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              {sleeveFilter.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Sleeves:</span>
+                  {sleeveFilter.map((sleeve) => (
+                    <Badge
+                      key={sleeve}
+                      variant="secondary"
+                      className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                      onClick={() => removeFilterItem(sleeve, sleeveFilter, setSleeveFilter)}
+                    >
+                      {sleeve}
                       <X className="h-3 w-3 ml-1" />
                     </Badge>
                   ))}
@@ -344,30 +380,62 @@ export function DiamondPricingDashboard({ initialData }: DiamondPricingDashboard
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-muted/50">
-                  <TableHead className="text-card-foreground">Sleeve</TableHead>
-                  <TableHead className="text-card-foreground">Colour</TableHead>
-                  <TableHead className="text-card-foreground">Clarity</TableHead>
-                  <TableHead className="text-card-foreground text-right">Rate</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.map((item, index) => (
-                  <TableRow key={index} className="border-border hover:bg-muted/50">
-                    <TableCell className="font-medium text-card-foreground">{item.sleeve}</TableCell>
-                    <TableCell className="text-card-foreground">{item.colour}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="bg-accent text-accent-foreground">
-                        {item.clarity}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-primary">₹{item.rate.toLocaleString()}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-muted/50">
+                    <TableHead className="text-card-foreground sticky left-0 bg-background z-10">Sleeve</TableHead>
+                    <TableHead className="text-card-foreground sticky left-16 bg-background z-10">Colour</TableHead>
+                    <TableHead className="text-card-foreground text-center">VVS</TableHead>
+                    <TableHead className="text-card-foreground text-center">VS1</TableHead>
+                    <TableHead className="text-card-foreground text-center">VS2</TableHead>
+                    <TableHead className="text-card-foreground text-center">SI1</TableHead>
+                    <TableHead className="text-card-foreground text-center">SI2</TableHead>
+                    <TableHead className="text-card-foreground text-center">SI3</TableHead>
+                    <TableHead className="text-card-foreground text-center">I1</TableHead>
+                    <TableHead className="text-card-foreground text-center">I2</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredData.map((item, index) => (
+                    <TableRow key={index} className="border-border hover:bg-muted/50">
+                      <TableCell className="font-medium text-card-foreground sticky left-0 bg-background z-10">
+                        {item.sleeve}
+                      </TableCell>
+                      <TableCell className="text-card-foreground sticky left-16 bg-background z-10">
+                        <Badge variant="outline" className="bg-accent text-accent-foreground">
+                          {item.colour}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.vvs)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.vs1)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.vs2)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.si1)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.si2)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.si3)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.i1)}
+                      </TableCell>
+                      <TableCell className="text-center font-bold text-primary">
+                        {formatRate(item.i2)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
 
           {filteredData.length === 0 && !isLoading && (
