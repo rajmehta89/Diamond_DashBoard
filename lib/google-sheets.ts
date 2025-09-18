@@ -15,13 +15,12 @@ export async function fetchDiamondData(): Promise<DiamondData[]> {
   try {
     console.log("[v0] Starting Google Sheets fetch...");
 
-       // Updated Google Sheets CSV export URL with your new sheet
+    // Updated Google Sheets CSV export URL with your new sheet
     const sheetId = "1w2_hYMXe4iZw-7iwhR4HUHQetRWsvpih";
     const gid = "1300949284"; // GID for the SLEEVE CHART sheet
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 
     console.log("[v0] Fetching from URL:", csvUrl);
-
 
     const response = await fetch(csvUrl, {
       method: "GET",
@@ -69,59 +68,55 @@ export async function fetchDiamondData(): Promise<DiamondData[]> {
       const columns = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map((col) => col.replace(/^"|"$/g, "").trim());
       console.log(`[v0] Line ${i} parsed columns:`, columns);
 
-      // Check if we have at least 10 columns
-      if (columns.length >= 10) {
+      // Check if we have at least 2 columns (sleeve and colour minimum)
+      if (columns.length >= 2) {
         const sleeve = columns[0];
         const colour = columns[1];
-        const vvs = columns[2];
-        const vs1 = columns[3];
-        const vs2 = columns[4];
-        const si1 = columns[5];
-        const si2 = columns[6];
-        const si3 = columns[7];
-        const i1 = columns[8];
-        const i2 = columns[9];
+        
+        // Get rate columns if they exist, otherwise use empty strings
+        const vvs = columns[2] || "";
+        const vs1 = columns[3] || "";
+        const vs2 = columns[4] || "";
+        const si1 = columns[5] || "";
+        const si2 = columns[6] || "";
+        const si3 = columns[7] || "";
+        const i1 = columns[8] || "";
+        const i2 = columns[9] || "";
 
         // Clean sleeve data (replace -- with -)
         const cleanSleeve = sleeve.replace(/--/g, "-");
 
-        // Check if sleeve and colour have data
-        if (cleanSleeve && colour) {
-          // Parse each rate as number, default to 0 if empty or invalid
-          const parseRate = (rateStr: string) => {
-            return rateStr ? Number.parseFloat(rateStr.replace(/[^\d.-]/g, "")) : 0;
-          };
+        // Check if ALL columns are empty - only skip if everything is empty
+        const allColumnsEmpty = !cleanSleeve && !colour && !vvs && !vs1 && !vs2 && !si1 && !si2 && !si3 && !i1 && !i2;
 
-          const diamondData: DiamondData = {
-            sleeve: cleanSleeve,
-            colour: colour.toUpperCase(),
-            vvs: parseRate(vvs),
-            vs1: parseRate(vs1),
-            vs2: parseRate(vs2),
-            si1: parseRate(si1),
-            si2: parseRate(si2),
-            si3: parseRate(si3),
-            i1: parseRate(i1),
-            i2: parseRate(i2),
-          };
-
-          console.log(`[v0] Line ${i} parsed data:`, diamondData);
-
-          // Only add if at least one rate is valid (not 0)
-          const hasValidRate = Object.values(diamondData).some((value, index) => {
-            if (index < 2) return false; // Skip sleeve and colour
-            return typeof value === 'number' && value > 0;
-          });
-
-          if (hasValidRate) {
-            data.push(diamondData);
-            console.log(`[v0] Line ${i} added to data`);
-          } else {
-            console.log(`[v0] Line ${i} skipped: no valid rates found`);
-          }
-        } else {
-          console.log(`[v0] Line ${i} skipped: missing sleeve or colour data`);
+        if (allColumnsEmpty) {
+          console.log(`[v0] Line ${i} skipped: all columns are empty`);
+          continue;
         }
+
+        // Parse each rate as number, default to 0 if empty or invalid
+        const parseRate = (rateStr: string) => {
+          return rateStr ? Number.parseFloat(rateStr.replace(/[^\d.-]/g, "")) : 0;
+        };
+
+        const diamondData: DiamondData = {
+          sleeve: cleanSleeve,
+          colour: colour.toUpperCase(),
+          vvs: parseRate(vvs),
+          vs1: parseRate(vs1),
+          vs2: parseRate(vs2),
+          si1: parseRate(si1),
+          si2: parseRate(si2),
+          si3: parseRate(si3),
+          i1: parseRate(i1),
+          i2: parseRate(i2),
+        };
+
+        console.log(`[v0] Line ${i} parsed data:`, diamondData);
+
+        // Add the row as long as at least one column has data
+        data.push(diamondData);
+        console.log(`[v0] Line ${i} added to data`);
       } else {
         console.log(`[v0] Line ${i} has insufficient columns:`, columns);
       }
