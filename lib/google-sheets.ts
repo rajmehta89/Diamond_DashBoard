@@ -15,12 +15,13 @@ export async function fetchDiamondData(): Promise<DiamondData[]> {
   try {
     console.log("[v0] Starting Google Sheets fetch...");
 
-    // Google Sheets CSV export URL - ensure the sheet is publicly accessible
-    const sheetId = "1cTNY19s84Kntql_IYtm2JFpFlNKQCi7W";
-    const gid = "293612211"; // GID for the NATURAL POLISH RATE sheet
+       // Updated Google Sheets CSV export URL with your new sheet
+    const sheetId = "1w2_hYMXe4iZw-7iwhR4HUHQetRWsvpih";
+    const gid = "1300949284"; // GID for the SLEEVE CHART sheet
     const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
 
     console.log("[v0] Fetching from URL:", csvUrl);
+
 
     const response = await fetch(csvUrl, {
       method: "GET",
